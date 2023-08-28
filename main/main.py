@@ -36,7 +36,10 @@ def check_region_valid(region_for_check: str) -> None:
 
 
 def select_by_main_okved(okved: Union[str, int], checking_company_dict: dict) -> Optional[str]:
-    """Проверяет словарь с компанией подходит ли основной ОКВЭД по группе ОКВЭД и в случае успеха возвращет его"""
+    """
+    Проверяет словарь с компанией подходит ли основной ОКВЭД по группе ОКВЭД
+    и в случае успеха возвращет его
+    """
     pattern = fr'^{re.escape(str(okved))}'
     code_okved = checking_company_dict.get('data', {}).get('СвОКВЭД', {}).get('СвОКВЭДОсн', {}).get('КодОКВЭД', '')
     if re.match(pattern, code_okved):
@@ -44,7 +47,10 @@ def select_by_main_okved(okved: Union[str, int], checking_company_dict: dict) ->
 
 
 def select_by_extra_okved(okved: Union[str, int], checking_company_dict: dict) -> Optional[str]:
-    """Проверяет словарь с компанией подходит ли дополнительный ОКВЭД по группе ОКВЭД и в случае успеха возвращет его"""
+    """
+    Проверяет словарь с компанией подходит ли дополнительный ОКВЭД
+    по группе ОКВЭД и в случае успеха возвращет его
+    """
     pattern = fr'^{re.escape(str(okved))}'
     extra_okved_list = checking_company_dict.get('data', {}).get('СвОКВЭД', {}).get('СвОКВЭДДоп', {})
 
@@ -69,7 +75,8 @@ def select_by_region(region_name: str, checking_company_dict: dict) -> bool:
 def process_json_file(file_path: str, okved: Union[str, int], region: str, file_info) -> Optional[list]:
     """Обрабатывает json файл в архиве и если компания из файла подходит пораметрам
     добавляет словарь с компанией в список.
-    После завершения обработки файла возвращает список со словарями с компаниями заданных параметров"""
+    После завершения обработки файла возвращает список со словарями с компаниями
+    заданных параметров"""
 
     results = []
 
@@ -100,8 +107,12 @@ def process_json_file(file_path: str, okved: Union[str, int], region: str, file_
 
         if results:
             return results
-    except FileNotFoundError as e:
-        print(f'Указанный файл не найден: {e}')
+    except FileNotFoundError as ex:
+        print(f'Указанный файл не найден: {ex}')
+    except zipfile.BadZipFile as ex:
+        print(f'Проблема с архивом: {ex}')
+    except json.JSONDecodeError as ex:
+        print(f'Проблема с JSON файлом: {ex}')
     except Exception as ex:
         print(f'Проблема с обработкой файла: {ex}')
 
@@ -125,9 +136,10 @@ def get_egrul_data_from_file(file_path: str, okved_group: Union[str, int], regio
 
         return [item for sublist in results if sublist for item in sublist if item]
 
-    except FileNotFoundError as e:
-        print(f'Указанный файл не найден: {e}')
-
+    except FileNotFoundError as ex:
+        print(f'Указанный файл не найден: {ex}')
+    except zipfile.BadZipFile as ex:
+        print(f'Проблема с архивом: {ex}')
     except Exception as ex:
         print(f'Проблема с обработкой файла: {ex}')
 
