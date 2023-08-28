@@ -19,7 +19,7 @@ db_password = os.getenv('DB_PASSWORD')
 
 
 def check_okved_valid(okved_for_check: Union[str, int]) -> None:
-    """Проверяет список ОКВЭД на валидность"""
+    """Проверяет ОКВЭД на валидность"""
     pattern = re.compile(r'^\d{2}(\.\d{2}(\.\d{1,2})?)?$')
     if not okved_for_check:
         raise ValueError("Необходимо ввести ОКВЭД")
@@ -41,7 +41,8 @@ def select_by_main_okved(okved: Union[str, int], checking_company_dict: dict) ->
     и в случае успеха возвращет его
     """
     pattern = fr'^{re.escape(str(okved))}'
-    code_okved = checking_company_dict.get('data', {}).get('СвОКВЭД', {}).get('СвОКВЭДОсн', {}).get('КодОКВЭД', '')
+    code_okved = checking_company_dict.get('data', {}).get('СвОКВЭД', {}).get('СвОКВЭДОсн', {}).\
+        get('КодОКВЭД', '')
     if re.match(pattern, code_okved):
         return code_okved
 
@@ -52,27 +53,31 @@ def select_by_extra_okved(okved: Union[str, int], checking_company_dict: dict) -
     по группе ОКВЭД и в случае успеха возвращет его
     """
     pattern = fr'^{re.escape(str(okved))}'
-    extra_okved_list = checking_company_dict.get('data', {}).get('СвОКВЭД', {}).get('СвОКВЭДДоп', {})
+    extra_okved_list = checking_company_dict.get('data', {}).get('СвОКВЭД', {}).\
+        get('СвОКВЭДДоп', {})
 
     checking_code = None
     if extra_okved_list:
         if isinstance(extra_okved_list, list):
             for code_okved in extra_okved_list:
-                if code_okved:
+                if code_okved and re.match(pattern, code_okved.get('КодОКВЭД')):
                     checking_code = code_okved.get('КодОКВЭД')
-        elif isinstance(extra_okved_list, dict):
+        elif isinstance(extra_okved_list, dict) \
+                and re.match(pattern, extra_okved_list.get('КодОКВЭД')):
             checking_code = extra_okved_list.get('КодОКВЭД')
 
-    if checking_code and re.match(pattern, checking_code):
+    if checking_code:
         return checking_code
 
 
 def select_by_region(region_name: str, checking_company_dict: dict) -> bool:
     """Проверяет словарь с компанией подходит ли он по заданному городу/региону"""
-    return region_name.title() in (checking_company_dict.get('data').get('СвРегОрг', {}).get('АдрРО', '')).split()
+    return region_name.title() in (checking_company_dict.get('data').get('СвРегОрг', {}).
+                                   get('АдрРО', '')).split()
 
 
-def process_json_file(file_path: str, okved: Union[str, int], region: str, file_info) -> Optional[list]:
+def process_json_file(file_path: str, okved: Union[str, int], region: str, file_info) \
+        -> Optional[list]:
     """Обрабатывает json файл в архиве и если компания из файла подходит пораметрам
     добавляет словарь с компанией в список.
     После завершения обработки файла возвращает список со словарями с компаниями
@@ -89,7 +94,8 @@ def process_json_file(file_path: str, okved: Union[str, int], region: str, file_
                     check_main_okved = select_by_main_okved(okved, company_dict)
                     check_extra_okved = select_by_extra_okved(okved, company_dict)
 
-                    if (check_main_okved or check_extra_okved) and select_by_region(region, company_dict):
+                    if (check_main_okved or check_extra_okved) \
+                            and select_by_region(region, company_dict):
                         new_comp = {
                             'company_name': company_dict.get('full_name'),
                             'okved': check_main_okved if check_main_okved else check_extra_okved,
@@ -111,7 +117,8 @@ def process_json_file(file_path: str, okved: Union[str, int], region: str, file_
         print(f'Проблема с обработкой файла: {ex}')
 
 
-def get_egrul_data_from_file(file_path: str, okved_group: Union[str, int], region: str) -> Optional[list]:
+def get_egrul_data_from_file(file_path: str, okved_group: Union[str, int], region: str) \
+        -> Optional[list]:
     """
     Получает список словарей с компаниями из архива по заданным ОКВЭД и региону.
     Параллельно проверяет все json файлы в архиве, используя библиотеку multiprocessing
@@ -122,7 +129,8 @@ def get_egrul_data_from_file(file_path: str, okved_group: Union[str, int], regio
 
     try:
         with zipfile.ZipFile(file_path, 'r') as zip_ref:
-            json_files = [file_info for file_info in zip_ref.infolist() if file_info.filename.endswith('.json')]
+            json_files = [file_info for file_info in zip_ref.infolist()
+                          if file_info.filename.endswith('.json')]
 
         with Pool((cpu_count())) as pool:
             results = pool.starmap(process_json_file, [(file_path, okved_group, region, file_info)
@@ -167,7 +175,8 @@ def insert_data_to_database(companies_data: List[dict]) -> None:
                     kpp = company.get('kpp')
                     legal_address = company.get('legal_address')
 
-                    cur.execute("INSERT INTO companies (company_name, okved, inn, kpp, legal_address) "
+                    cur.execute("INSERT INTO companies "
+                                "(company_name, okved, inn, kpp, legal_address) "
                                 "VALUES (%s, %s, %s, %s, %s)",
                                 (company_name, okved_comp, inn, kpp, legal_address))
                 con.commit()
@@ -178,10 +187,10 @@ def insert_data_to_database(companies_data: List[dict]) -> None:
 
 def main():
     """
-    Приложение для получения сведений по компаниям в соотвествии с заданным списком ОКВЭД и регионом из
-    архивированного файла.
-    В случае успешного получения данных, эти сведения (название компании, код ОКВЭД, ИНН, КПП и место регистрации ЮЛ)
-    вносятся в базу данных PostgreSQL.
+    Приложение для получения сведений по компаниям в соотвествии с заданным списком ОКВЭД и
+    регионом из архивированного файла.
+    В случае успешного получения данных, эти сведения (название компании, код ОКВЭД, ИНН, КПП и
+    место регистрации ЮЛ) вносятся в базу данных PostgreSQL.
 
     Параметры:
     - okved: Группировка ОКВЭД или конкретный ОКВЭД, по которым осуществляется фильтрация компаний.
