@@ -4,8 +4,8 @@ from main.main import *
 
 
 def test_check_okved_valid_positive():
-    assert not check_okved_valid(62)
-    assert not check_okved_valid('62.02')
+    assert check_okved_valid(62) is None
+    assert check_okved_valid('62.02') is None
 
 
 def test_check_okved_valid_negetive():
@@ -17,7 +17,7 @@ def test_check_okved_valid_negetive():
 
 
 def test_check_region_valid_positive():
-    assert not check_region_valid('Москва')
+    assert check_region_valid('Москва') is None
 
 
 def test_check_region_valid_negative():
@@ -49,9 +49,9 @@ def test_select_by_main_okved_negative():
             }
         }
     }
-    assert not select_by_main_okved('63.02', company_dict)
-    assert not select_by_main_okved(63, company_dict)
-    assert not select_by_main_okved('63', company_dict)
+    assert select_by_main_okved('63.02', company_dict) is None
+    assert select_by_main_okved(63, company_dict) is None
+    assert select_by_main_okved('63', company_dict) is None
 
 
 def test_select_by_extra_okved_positive():
@@ -97,7 +97,26 @@ def test_select_by_extra_okved_negative():
             }
         }
     }
-    assert not select_by_extra_okved(65, company_dict)
-    assert not select_by_extra_okved('65', company_dict)
-    assert not select_by_extra_okved('62.02.01', company_dict)
-    assert not select_by_extra_okved(65, company_dict_empty)
+    assert select_by_extra_okved(65, company_dict) is None
+    assert select_by_extra_okved('65', company_dict) is None
+    assert select_by_extra_okved('62.02.01', company_dict) is None
+    assert select_by_extra_okved(65, company_dict_empty) is None
+
+
+def test_select_by_region_positive():
+    company_dict = {
+        'data': {'СвРегОрг': {'АдрРО': 'Москва ул. Полярная, д.2'}}
+    }
+    assert select_by_region('москва', company_dict)
+    assert select_by_region('Москва', company_dict)
+
+
+def test_select_by_region_negative():
+    company_dict = {
+        'data': {'СвРегОрг': {'АдрРО': 'Москва ул. Полярная, д.2'}}
+    }
+    assert select_by_region('тверь', company_dict) is False
+    assert select_by_region('Тверь', company_dict) is False
+
+
+
