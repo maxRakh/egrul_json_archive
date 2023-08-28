@@ -90,18 +90,12 @@ def process_json_file(file_path: str, okved: Union[str, int], region: str, file_
                     check_extra_okved = select_by_extra_okved(okved, company_dict)
 
                     if (check_main_okved or check_extra_okved) and select_by_region(region, company_dict):
-                        company_name = company_dict.get('full_name')
-                        okved = check_main_okved if check_main_okved else check_extra_okved
-                        inn = company_dict.get('inn')
-                        kpp = company_dict.get('kpp')
-                        legal_address = company_dict.get('data').get('СвРегОрг').get('АдрРО')
-
                         new_comp = {
-                            'company_name': company_name,
-                            'okved': okved,
-                            'inn': inn,
-                            'kpp': kpp,
-                            'legal_address': legal_address
+                            'company_name': company_dict.get('full_name'),
+                            'okved': check_main_okved if check_main_okved else check_extra_okved,
+                            'inn': company_dict.get('inn'),
+                            'kpp': company_dict.get('kpp'),
+                            'legal_address': company_dict.get('data').get('СвРегОрг').get('АдрРО')
                         }
                         results.append(new_comp)
 
