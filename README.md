@@ -24,6 +24,7 @@ DB_PASSWORD=пароль
 3. Создайте виртуальное окружение и активируйте его
 
 `python3 -m venv venv`
+
 `source venv/bin/activate`
 
 
