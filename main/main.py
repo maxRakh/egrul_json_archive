@@ -108,13 +108,11 @@ def process_json_file(file_path: str, okved: Union[str, int], region: str, file_
         if results:
             return results
     except FileNotFoundError as ex:
-        print(f'Указанный файл не найден: {ex}')
+        raise FileNotFoundError(f'Указанный файл не найден: {ex}') from ex
     except zipfile.BadZipFile as ex:
-        print(f'Проблема с архивом: {ex}')
-    except json.JSONDecodeError as ex:
-        print(f'Проблема с JSON файлом: {ex}')
+        raise zipfile.BadZipFile(f'Проблема с архивом: {ex}') from ex
     except Exception as ex:
-        print(f'Проблема с обработкой файла: {ex}')
+        raise Exception(f'Проблема с обработкой файла: {ex}') from ex
 
 
 def get_egrul_data_from_file(file_path: str, okved_group: Union[str, int], region: str) \
@@ -139,11 +137,11 @@ def get_egrul_data_from_file(file_path: str, okved_group: Union[str, int], regio
         return [item for sublist in results if sublist for item in sublist if item]
 
     except FileNotFoundError as ex:
-        print(f'Указанный файл не найден: {ex}')
+        raise FileNotFoundError(f'Указанный файл не найден: {ex}') from ex
     except zipfile.BadZipFile as ex:
-        print(f'Проблема с архивом: {ex}')
+        raise zipfile.BadZipFile(f'Проблема с архивом: {ex}') from ex
     except Exception as ex:
-        print(f'Проблема с обработкой файла: {ex}')
+        raise Exception(f'Проблема с обработкой файла: {ex}') from ex
 
 
 def insert_data_to_database(companies_data: List[dict]) -> None:
@@ -182,7 +180,7 @@ def insert_data_to_database(companies_data: List[dict]) -> None:
                 con.commit()
                 print("Записи внесены в БД успешно.")
     except psycopg2.Error as ex:
-        print(f"DataBase Error: {ex}")
+        raise psycopg2.Error(f"DataBase Error: {ex}") from ex
 
 
 def main():
