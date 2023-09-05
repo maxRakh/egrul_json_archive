@@ -9,24 +9,22 @@
 
 `git clone https://github.com/maxRakh/egrul_json_archive.git`
 
-2. Создайте переменные окружения
+
+2. Создайте виртуальное окружение и активируйте его
+
+`python3 -m venv venv`
+
+`source venv/bin/activate`
+
+3. Создайте переменные окружения
 
 ```
-API_KEY=ваш_апи_ключ  # получается в личном кабинете https://ofdata.ru/login
-  
 DB_HOST=адрес_хоста
 DB_PORT=порт  
 DB_NAME=имя_базы_данных 
 DB_USER=имя_юзера 
 DB_PASSWORD=пароль
 ```
-
-3. Создайте виртуальное окружение и активируйте его
-
-`python3 -m venv venv`
-
-`source venv/bin/activate`
-
 
 4. Установите зависимости
 
