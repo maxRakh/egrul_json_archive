@@ -2,12 +2,19 @@ import json
 import os
 import re
 import zipfile
+import logging.config
 from datetime import datetime
 from multiprocessing import Pool, cpu_count
 from typing import List, Optional, Union
 
 import psycopg2
 from dotenv import load_dotenv
+
+from config import DEFAULT_CONFIG
+
+
+logger = logging.getLogger(__name__)
+logging.config.dictConfig(DEFAULT_CONFIG)
 
 load_dotenv()
 
@@ -25,7 +32,8 @@ def check_okved_valid(okved_for_check: Union[str, int]) -> None:
         raise ValueError('Необходимо ввести ОКВЭД')
     if not pattern.match(str(okved_for_check)):
         raise ValueError(
-            'Необходимо правильно ввести группировку или конкретный ОКВЭД')
+            'Необходимо правильно ввести группировку или конкретный ОКВЭД'
+        )
 
 
 def check_region_valid(region_for_check: str) -> None:
@@ -121,11 +129,11 @@ def process_json_file(
         if results:
             return results
     except FileNotFoundError as ex:
-        raise FileNotFoundError(f'Указанный файл не найден: {ex}') from ex
+        logger.error(f'Указанный файл не найден: {ex}')
     except zipfile.BadZipFile as ex:
-        raise zipfile.BadZipFile(f'Проблема с архивом: {ex}') from ex
+        logger.error(f'Проблема с архивом: {ex}')
     except Exception as ex:
-        raise Exception(f'Проблема с обработкой файла: {ex}') from ex
+        logger.error(f'Проблема с обработкой файла: {ex}')
 
 
 def get_egrul_data_from_file(
@@ -155,11 +163,11 @@ def get_egrul_data_from_file(
         ]
 
     except FileNotFoundError as ex:
-        raise FileNotFoundError(f'Указанный файл не найден: {ex}') from ex
+        logger.error(f'Указанный файл не найден: {ex}')
     except zipfile.BadZipFile as ex:
-        raise zipfile.BadZipFile(f'Проблема с архивом: {ex}') from ex
+        logger.error(f'Проблема с архивом: {ex}')
     except Exception as ex:
-        raise Exception(f'Проблема с обработкой файла: {ex}') from ex
+        logger.error(f'Проблема с обработкой файла: {ex}')
 
 
 def insert_data_to_database(companies_data: List[dict]) -> None:
@@ -178,14 +186,14 @@ def insert_data_to_database(companies_data: List[dict]) -> None:
             with con.cursor() as cur:
                 cur.execute('''CREATE TABLE IF NOT EXISTS companies(
                     id SERIAL PRIMARY KEY,
-                    company_name VARCHAR(155),
+                    company_name VARCHAR(255),
                     okved VARCHAR(155),
                     inn VARCHAR(10),
                     kpp VARCHAR(10),
-                    legal_address VARCHAR(155)
+                    legal_address VARCHAR(255)
                     );''')
 
-                print('Таблица создана успешно.')
+                logger.info('Таблица создана успешно.')
 
                 for company in companies_data:
                     company_name = company.get('company_name')
@@ -201,9 +209,9 @@ def insert_data_to_database(companies_data: List[dict]) -> None:
                         (company_name, okved_comp, inn, kpp, legal_address)
                     )
                 con.commit()
-                print("Записи внесены в БД успешно.")
+                logger.info("Записи внесены в БД успешно.")
     except psycopg2.Error as ex:
-        raise psycopg2.Error(f"DataBase Error: {ex}") from ex
+        logger.error(f"DataBase Error: {ex}")
 
 
 def main():
@@ -225,6 +233,8 @@ def main():
     okved = 62
     region = 'Хабаровск'
     file_path = '/Users/maxr/Downloads/egrul.json.zip'
+
+    logger.info('Начало работы приложения.')
     data = get_egrul_data_from_file(
         file_path=file_path, okved_group=okved, region=region
     )
@@ -232,10 +242,12 @@ def main():
     if data:
         insert_data_to_database(data)
     else:
-        print("Компаний по заданным параметрам не найдено.")
+        logger.warning("Компаний по заданным параметрам не найдено.")
+    logger.info('Окончание работы приложения')
 
 
 if __name__ == '__main__':
     start_time = datetime.now()
+
     main()
-    print(f'Время работы программы: {datetime.now() - start_time}')
+    logger.info(f'Время работы программы: {datetime.now() - start_time}')
