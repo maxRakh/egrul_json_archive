@@ -93,52 +93,43 @@ def select_by_region(region_name: str, checking_company_dict: dict) -> bool:
 
 def process_json_file(
         file_path: str, okved: Union[str, int], region: str, file_info
-) -> Optional[list]:
+) -> bool:
     """Обрабатывает json файл в архиве и если компания из файла подходит
     пораметрам добавляет словарь с компанией в список.
     После завершения обработки файла возвращает список со словарями с компаниями
     заданных параметров"""
-
     results = []
 
-    try:
-        with zipfile.ZipFile(file_path, 'r') as zip_ref:
-            with zip_ref.open(file_info, 'r') as json_file:
-                json_content = json.load(json_file)
+    with zipfile.ZipFile(file_path, 'r') as zip_ref:
+        with zip_ref.open(file_info, 'r') as json_file:
+            json_content = json.load(json_file)
 
-                for company_dict in json_content:
-                    check_main_okved = select_by_main_okved(
-                        okved, company_dict)
-                    check_extra_okved = select_by_extra_okved(
-                        okved, company_dict)
+            for company_dict in json_content:
+                check_main_okved = select_by_main_okved(okved, company_dict)
+                check_extra_okved = select_by_extra_okved(okved, company_dict)
 
-                    if (check_main_okved or
-                        check_extra_okved) and select_by_region(
-                            region, company_dict):
-                        new_comp = {
-                            'company_name': company_dict.get('full_name'),
-                            'okved': check_main_okved if check_main_okved
-                            else check_extra_okved,
-                            'inn': company_dict.get('inn'),
-                            'kpp': company_dict.get('kpp'),
-                            'legal_address': company_dict.get(
-                                'data').get('СвРегОрг').get('АдрРО')
-                        }
-                        results.append(new_comp)
+                if (check_main_okved or
+                    check_extra_okved) and select_by_region(
+                        region, company_dict):
+                    new_comp = {
+                        'company_name': company_dict.get('full_name'),
+                        'okved': check_main_okved if check_main_okved
+                        else check_extra_okved,
+                        'inn': company_dict.get('inn'),
+                        'kpp': company_dict.get('kpp'),
+                        'legal_address': company_dict.get(
+                            'data').get('СвРегОрг').get('АдрРО')
+                    }
+                    results.append(new_comp)
 
-        if results:
-            return results
-    except FileNotFoundError as ex:
-        logger.error(f'Указанный файл не найден: {ex}')
-    except zipfile.BadZipFile as ex:
-        logger.error(f'Проблема с архивом: {ex}')
-    except Exception as ex:
-        logger.error(f'Проблема с обработкой файла: {ex}')
+    if results:
+        return insert_data_to_database(results)
+    return False
 
 
 def get_egrul_data_from_file(
         file_path: str, okved_group: Union[str, int], region: str
-) -> Optional[list]:
+) -> bool:
     """
     Получает список словарей с компаниями из архива по заданным ОКВЭД и региону.
     Параллельно проверяет все json файлы в архиве, используя библиотеку
@@ -147,6 +138,8 @@ def get_egrul_data_from_file(
     """
     check_okved_valid(okved_group)
     check_region_valid(region)
+
+    data_found = False
 
     try:
         with zipfile.ZipFile(file_path, 'r') as zip_ref:
@@ -157,24 +150,24 @@ def get_egrul_data_from_file(
             results = pool.starmap(
                 process_json_file, [(file_path, okved_group, region, file_info
                                      ) for file_info in json_files])
-
-        return [
-            item for sublist in results if sublist for item in sublist if item
-        ]
+        if any(results):
+            data_found = True
 
     except FileNotFoundError as ex:
         logger.error(f'Указанный файл не найден: {ex}')
     except zipfile.BadZipFile as ex:
         logger.error(f'Проблема с архивом: {ex}')
-    except Exception as ex:
-        logger.error(f'Проблема с обработкой файла: {ex}')
+
+    return data_found
 
 
-def insert_data_to_database(companies_data: List[dict]) -> None:
+def insert_data_to_database(companies_data: List[dict]) -> bool:
     """
     Создает таблицу в БД, если она не существует и вносит в нее полученные
     из файла данные.
     """
+    records_inserted = False
+
     try:
         with psycopg2.connect(
             database=db_name,
@@ -193,8 +186,6 @@ def insert_data_to_database(companies_data: List[dict]) -> None:
                     legal_address VARCHAR(255)
                     );''')
 
-                logger.info('Таблица создана успешно.')
-
                 for company in companies_data:
                     company_name = company.get('company_name')
                     okved_comp = company.get('okved')
@@ -209,9 +200,11 @@ def insert_data_to_database(companies_data: List[dict]) -> None:
                         (company_name, okved_comp, inn, kpp, legal_address)
                     )
                 con.commit()
-                logger.info("Записи внесены в БД успешно.")
+                records_inserted = True
     except psycopg2.Error as ex:
         logger.error(f"DataBase Error: {ex}")
+
+    return records_inserted
 
 
 def main():
@@ -235,19 +228,19 @@ def main():
     file_path = '/Users/maxr/Downloads/egrul.json.zip'
 
     logger.info('Начало работы приложения.')
-    data = get_egrul_data_from_file(
+    data_found = get_egrul_data_from_file(
         file_path=file_path, okved_group=okved, region=region
     )
 
-    if data:
-        insert_data_to_database(data)
-    else:
-        logger.warning("Компаний по заданным параметрам не найдено.")
+    if data_found:
+        logger.info("Данные внесены в БД успешно.")
+    elif not data_found:
+        logger.info("Компаний по заданным параметрам не найдено.")
+
     logger.info('Окончание работы приложения')
 
 
 if __name__ == '__main__':
     start_time = datetime.now()
-
     main()
     logger.info(f'Время работы программы: {datetime.now() - start_time}')
