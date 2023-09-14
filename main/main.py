@@ -118,7 +118,7 @@ def process_json_file(
                         'inn': company_dict.get('inn'),
                         'kpp': company_dict.get('kpp'),
                         'legal_address': company_dict.get(
-                            'data').get('СвРегОрг').get('АдрРО')
+                            'data', {}).get('СвРегОрг', {}).get('АдрРО')
                     }
                     results.append(new_comp)
 
@@ -163,8 +163,9 @@ def get_egrul_data_from_file(
 
 def insert_data_to_database(companies_data: List[dict]) -> bool:
     """
-    Создает таблицу в БД, если она не существует и вносит в нее полученные
-    из файла данные.
+    Создает 2 связанные адресом таблицы в БД, если они не существует и вносит
+    в нее полученные из файла данные.
+    Возвращает True если были внесены какие-то данные, иначе False.
     """
     records_inserted = False
 
@@ -177,13 +178,19 @@ def insert_data_to_database(companies_data: List[dict]) -> bool:
             port=db_port
         ) as con:
             with con.cursor() as cur:
+                cur.execute('''CREATE TABLE IF NOT EXISTS addresses (
+                    id SERIAL PRIMARY KEY,
+                    address VARCHAR(255)
+                    );''')
+
                 cur.execute('''CREATE TABLE IF NOT EXISTS companies(
                     id SERIAL PRIMARY KEY,
                     company_name VARCHAR(255),
                     okved VARCHAR(155),
                     inn VARCHAR(10),
                     kpp VARCHAR(10),
-                    legal_address VARCHAR(255)
+                    address_id INT,
+                    FOREIGN KEY (address_id) REFERENCES addresses(id)
                     );''')
 
                 for company in companies_data:
@@ -194,10 +201,24 @@ def insert_data_to_database(companies_data: List[dict]) -> bool:
                     legal_address = company.get('legal_address')
 
                     cur.execute(
+                        "SELECT id FROM addresses WHERE address = %s",
+                        (legal_address,)
+                    )
+                    address_id = cur.fetchone()
+
+                    if address_id is None:
+                        cur.execute(
+                            "INSERT INTO addresses (address) "
+                            "VALUES (%s) RETURNING id",
+                            (legal_address,)
+                        )
+                        address_id = cur.fetchone()[0]
+
+                    cur.execute(
                         "INSERT INTO companies "
-                        "(company_name, okved, inn, kpp, legal_address) "
+                        "(company_name, okved, inn, kpp, address_id) "
                         "VALUES (%s, %s, %s, %s, %s)",
-                        (company_name, okved_comp, inn, kpp, legal_address)
+                        (company_name, okved_comp, inn, kpp, address_id)
                     )
                 con.commit()
                 records_inserted = True
